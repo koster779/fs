@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Симулятор Фермы</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container { max-width: 600px; margin: 0 auto; }
+        .header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .stat-item {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 10px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .stat-value { font-size: 24px; font-weight: bold; display: block; }
+        .stat-label { font-size: 12px; opacity: 0.8; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab {
+            flex: 1;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            border-radius: 15px;
+            color: #fff;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .tab.active { background: rgba(255, 255, 255, 0.3); transform: scale(1.05); }
+        .content {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 20px;
+            min-height: 400px;
+        }
+        .plots-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+        .plot {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .plot:hover { transform: translateY(-5px); background: rgba(255, 255, 255, 0.25); }
+        .plot-icon { font-size: 48px; margin-bottom: 10px; }
+        .plot-status { font-size: 14px; opacity: 0.9; }
+        .timer { font-size: 12px; margin-top: 5px; color: #ffd700; }
+        .shop-grid { display: grid; gap: 15px; }
+        .shop-item {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 15px;
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .shop-item:hover { background: rgba(255, 255, 255, 0.25); transform: translateX(5px); }
+        .shop-icon { font-size: 40px; }
+        .shop-info { flex: 1; }
+        .shop-name { font-size: 18px; font-weight: bold; }
+        .shop-details { font-size: 12px; opacity: 0.8; margin-top: 5px; }
+        .shop-price { font-size: 20px; font-weight: bold; color: #ffd700; }
+        .animals-list { display: grid; gap: 15px; }
+        .animal-card {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 15px;
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .animal-icon { font-size: 40px; }
+        .animal-info { flex: 1; }
+        .collect-btn {
+            background: #4CAF50;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 10px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .collect-btn:disabled { background: #666; cursor: not-allowed; }
+        .hidden { display: none; }
+        .loading { text-align: center; padding: 40px; font-size: 18px; }
+        .error { background: #f44336; padding: 15px; border-radius: 10px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 id="farmName">🌾 Загрузка...</h1>
+            <div class="stats">
+                <div class="stat-item">
+                    <span class="stat-value" id="coins">0</span>
+                    <span class="stat-label">💰 Монеты</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="level">1</span>
+                    <span class="stat-label">⭐ Уровень</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="energy">100</span>
+                    <span class="stat-label">⚡ Энергия</span>
+                </div>
+            </div>
+        </div>
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('farm')">🌾 Ферма</button>
+            <button class="tab" onclick="showTab('shop')">🏪 Магазин</button>
+            <button class="tab" onclick="showTab('animals')">🐄 Животные</button>
+        </div>
+        <div class="content">
+            <div id="farmTab">
+                <h2>Ваши грядки</h2>
+                <div class="plots-grid" id="plotsGrid"></div>
+            </div>
+            <div id="shopTab" class="hidden">
+                <h2>Магазин семян</h2>
+                <div class="shop-grid" id="shopGrid"></div>
+            </div>
+            <div id="animalsTab" class="hidden">
+                <h2>Ваши животные</h2>
+                <div class="animals-list" id="animalsList"></div>
+                <h3 style="margin-top: 20px;">Купить животных</h3>
+                <div class="shop-grid" id="animalShop"></div>
+            </div>
+        </div>
+    </div>
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        
+        // API на дедике
+        const API_URL = 'http://185.41.185.92:21959/api';
+        
+        let userData = null;
+        let gameData = null;
+        let selectedPlot = null;
+        
+        const CROPS = {
+            wheat: { name: '🌾 Пшеница', growTime: 60, cost: 10, sellPrice: 25, exp: 5, energy: 5 },
+            carrot: { name: '🥕 Морковь', growTime: 120, cost: 15, sellPrice: 40, exp: 8, energy: 6 },
+            corn: { name: '🌽 Кукуруза', growTime: 180, cost: 25, sellPrice: 60, exp: 12, energy: 8 },
+            tomato: { name: '🍅 Помидоры', growTime: 300, cost: 40, sellPrice: 100, exp: 20, energy: 10 },
+            pumpkin: { name: '🎃 Тыква', growTime: 600, cost: 80, sellPrice: 200, exp: 40, energy: 15 }
+        };
+        
+        const ANIMALS = {
+            chicken: { name: '🐔 Курица', cost: 100, productionTime: 300, product: '🥚', value: 30 },
+            pig: { name: '🐷 Свинья', cost: 200, productionTime: 420, product: '🍄', value: 60 },
+            sheep: { name: '🐑 Овца', cost: 250, productionTime: 480, product: '🧶', value: 70 },
+            cow: { name: '🐄 Корова', cost: 300, productionTime: 600, product: '🥛', value: 80 }
+        };
+        
+        async function apiCall(endpoint, data = {}) {
+            try {
+                const response = await fetch(`${API_URL}${endpoint}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Ошибка сервера');
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('API Error:', error);
+                throw error;
+            }
+        }
+        
+        function showError(title, details) {
+            document.body.innerHTML = `
+                <div style="padding: 20px; max-width: 600px; margin: 0 auto;">
+                    <div style="background: #f44336; color: white; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+                        <h2 style="margin: 0 0 10px 0;">❌ ${title}</h2>
+                        <p style="margin: 0; font-size: 14px;">${details}</p>
+                    </div>
+                    <button onclick="location.reload()" style="
+                        width: 100%;
+                        padding: 15px;
+                        background: #4CAF50;
+                        color: white;
+                        border: none;
+                        border-radius: 10px;
+                        font-size: 16px;
+                        cursor: pointer;
+                    ">🔄 Перезагрузить</button>
+                </div>
+            `;
+        }
+        
+        function showLoading(message) {
+            document.getElementById('farmName').textContent = '⏳ ' + message;
+        }
+        
+        async function loadGameData() {
+            const userId = tg.initDataUnsafe.user?.id;
+            const username = tg.initDataUnsafe.user?.username;
+            const firstName = tg.initDataUnsafe.user?.first_name || 'Player';
+            
+            if (!userId) {
+                showError('Ошибка', 'Открой из Telegram!');
+                return;
+            }
+            
+            try {
+                showLoading('Загрузка данных...');
+                
+                // Попробуем получить данные пользователя
+                const data = await apiCall('/user', { userId });
+                userData = data.user;
+                gameData = {
+                    crops: data.crops || [],
+                    animals: data.animals || []
+                };
+                updateHeader();
+                renderFarm();
+                renderShop();
+                renderAnimals();
+            } catch (error) {
+                console.error('Load error:', error);
+                
+                // Если пользователь не найден, создаем нового
+                if (error.message.includes('not found')) {
+                    try {
+                        showLoading('Создание фермы...');
+                        
+                        // Генерируем уникальное имя фермы (только английские буквы)
+                        const randomNum = Math.floor(Math.random() * 10000);
+                        const farmName = username ? 
+                            `${username.replace(/[^a-zA-Z0-9]/g, '')}Farm${randomNum}` : 
+                            `Farm${randomNum}`;
+                        
+                        // Регистрируем пользователя
+                        await apiCall('/register', {
+                            userId: userId,
+                            username: username,
+                            farmName: farmName
+                        });
+                        
+                        showLoading('Загрузка фермы...');
+                        
+                        // Загружаем данные снова
+                        const data = await apiCall('/user', { userId });
+                        userData = data.user;
+                        gameData = {
+                            crops: data.crops || [],
+                            animals: data.animals || []
+                        };
+                        updateHeader();
+                        renderFarm();
+                        renderShop();
+                        renderAnimals();
+                        
+                        tg.showAlert(`🎉 Добро пожаловать на ферму ${farmName}!`);
+                    } catch (regError) {
+                        console.error('Registration error:', regError);
+                        showError(
+                            'Ошибка регистрации',
+                            `Не удалось создать ферму.<br><br>` +
+                            `Детали: ${regError.message}<br><br>` +
+                            `Проверь что DATABASE_URL настроена в Netlify.`
+                        );
+                    }
+                } else {
+                    showError(
+                        'Ошибка загрузки',
+                        `Не удалось загрузить данные.<br><br>` +
+                        `Детали: ${error.message}<br><br>` +
+                        `Возможные причины:<br>` +
+                        `• Functions не работают<br>` +
+                        `• DATABASE_URL не настроена<br>` +
+                        `• Проблема с базой данных`
+                    );
+                }
+            }
+        }
+        
+        function saveGameData() {
+            if (!API_URL) {
+                localStorage.setItem('farmData', JSON.stringify({
+                    user: userData,
+                    gameData: gameData
+                }));
+            }
+        }
+        
+        function updateHeader() {
+            document.getElementById('farmName').textContent = `🌾 ${userData.farm_name}`;
+            document.getElementById('coins').textContent = userData.coins;
+            document.getElementById('level').textContent = userData.level;
+            document.getElementById('energy').textContent = `${userData.energy}/${userData.max_energy}`;
+        }
+        
+        function showTab(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            document.getElementById('farmTab').classList.add('hidden');
+            document.getElementById('shopTab').classList.add('hidden');
+            document.getElementById('animalsTab').classList.add('hidden');
+            
+            document.getElementById(tabName + 'Tab').classList.remove('hidden');
+        }
+
+        function renderFarm() {
+            const grid = document.getElementById('plotsGrid');
+            grid.innerHTML = '';
+            
+            for (let i = 0; i < 6; i++) {
+                const div = document.createElement('div');
+                div.className = 'plot';
+                
+                const crop = gameData.crops.find(c => c.plot_number === i);
+                
+                if (crop) {
+                    const cropData = CROPS[crop.crop_type];
+                    const now = Math.floor(Date.now() / 1000);
+                    const ready = now >= crop.harvest_time;
+                    
+                    div.innerHTML = `
+                        <div class="plot-icon">${cropData.name.split(' ')[0]}</div>
+                        <div class="plot-status">${ready ? 'Готово!' : 'Растет...'}</div>
+                        <div class="timer" data-harvest="${crop.harvest_time}"></div>
+                    `;
+                    
+                    if (ready) {
+                        div.onclick = () => harvestCrop(crop.id);
+                    }
+                } else {
+                    div.innerHTML = `
+                        <div class="plot-icon">🟫</div>
+                        <div class="plot-status">Пустая грядка</div>
+                    `;
+                    div.onclick = () => selectPlot(i);
+                }
+                
+                grid.appendChild(div);
+            }
+        }
+        
+        function renderShop() {
+            const grid = document.getElementById('shopGrid');
+            grid.innerHTML = '';
+            
+            Object.entries(CROPS).forEach(([id, crop]) => {
+                const div = document.createElement('div');
+                div.className = 'shop-item';
+                div.innerHTML = `
+                    <div class="shop-icon">${crop.name.split(' ')[0]}</div>
+                    <div class="shop-info">
+                        <div class="shop-name">${crop.name}</div>
+                        <div class="shop-details">⏱️ ${formatTime(crop.growTime)} | ⚡ ${crop.energy}</div>
+                    </div>
+                    <div class="shop-price">${crop.cost}💰</div>
+                `;
+                div.onclick = () => buyCrop(id);
+                grid.appendChild(div);
+            });
+        }
+        
+        function renderAnimals() {
+            const list = document.getElementById('animalsList');
+            list.innerHTML = gameData.animals.length ? '' : '<p>Пока нет животных. Купи ниже!</p>';
+            
+            gameData.animals.forEach((animal) => {
+                const animalData = ANIMALS[animal.animal_type];
+                const now = Math.floor(Date.now() / 1000);
+                const ready = now >= (animal.last_collected + animalData.productionTime);
+                
+                const div = document.createElement('div');
+                div.className = 'animal-card';
+                div.innerHTML = `
+                    <div class="animal-icon">${animalData.name.split(' ')[0]}</div>
+                    <div class="animal-info">
+                        <div>${animalData.name}</div>
+                        <div style="font-size: 12px; opacity: 0.8;">${ready ? 'Готово к сбору!' : 'Производит...'}</div>
+                    </div>
+                    <button class="collect-btn" ${!ready ? 'disabled' : ''} onclick="collectAnimal(${animal.id})">
+                        Собрать ${animalData.product}
+                    </button>
+                `;
+                list.appendChild(div);
+            });
+            
+            const shop = document.getElementById('animalShop');
+            shop.innerHTML = '';
+            
+            Object.entries(ANIMALS).forEach(([id, animal]) => {
+                const div = document.createElement('div');
+                div.className = 'shop-item';
+                div.innerHTML = `
+                    <div class="shop-icon">${animal.name.split(' ')[0]}</div>
+                    <div class="shop-info">
+                        <div class="shop-name">${animal.name}</div>
+                        <div class="shop-details">Производит ${animal.product} каждые ${formatTime(animal.productionTime)}</div>
+                    </div>
+                    <div class="shop-price">${animal.cost}💰</div>
+                `;
+                div.onclick = () => buyAnimal(id);
+                shop.appendChild(div);
+            });
+        }
+        
+        function selectPlot(plotNumber) {
+            selectedPlot = plotNumber;
+            showTab('shop');
+            tg.showAlert('Выбери культуру для посадки');
+        }
+        
+        async function buyCrop(cropType) {
+            if (selectedPlot === null) {
+                tg.showAlert('Сначала выбери пустую грядку!');
+                return;
+            }
+            
+            const crop = CROPS[cropType];
+            
+            // Проверки
+            if (userData.coins < crop.cost) {
+                tg.showAlert('Недостаточно монет!');
+                return;
+            }
+            if (userData.energy < crop.energy) {
+                tg.showAlert('Недостаточно энергии!');
+                return;
+            }
+            
+            // Без API - локально
+            if (!API_URL) {
+                userData.coins -= crop.cost;
+                userData.energy -= crop.energy;
+                
+                const now = Math.floor(Date.now() / 1000);
+                gameData.crops.push({
+                    id: Date.now(),
+                    crop_type: cropType,
+                    planted_at: now,
+                    harvest_time: now + crop.growTime,
+                    plot_number: selectedPlot
+                });
+                
+                selectedPlot = null;
+                saveGameData();
+                updateHeader();
+                renderFarm();
+                showTab('farm');
+                tg.showAlert(`${crop.name} посажена!`);
+                return;
+            }
+            
+            // С API
+            try {
+                const result = await apiCall('/plant', {
+                    userId: userData.user_id,
+                    cropType: cropType,
+                    plotNumber: selectedPlot
+                });
+                
+                userData = result.user;
+                gameData.crops = result.crops;
+                
+                selectedPlot = null;
+                saveGameData();
+                updateHeader();
+                renderFarm();
+                showTab('farm');
+                
+                tg.showAlert(`${crop.name} посажена!`);
+            } catch (error) {
+                console.error('Plant error:', error);
+                tg.showAlert('Ошибка: ' + error.message);
+            }
+        }
+        
+        async function harvestCrop(cropId) {
+            // Без API - локально
+            if (!API_URL) {
+                const cropIndex = gameData.crops.findIndex(c => c.id === cropId);
+                if (cropIndex === -1) return;
+                
+                const cropData = gameData.crops[cropIndex];
+                const crop = CROPS[cropData.crop_type];
+                
+                userData.coins += crop.sellPrice;
+                userData.experience += crop.exp;
+                
+                // Проверка уровня
+                const expNeeded = userData.level * 100;
+                if (userData.experience >= expNeeded) {
+                    userData.experience -= expNeeded;
+                    userData.level++;
+                    tg.showAlert(`🎉 Уровень повышен! Теперь ${userData.level} уровень!`);
+                }
+                
+                gameData.crops.splice(cropIndex, 1);
+                
+                saveGameData();
+                updateHeader();
+                renderFarm();
+                
+                tg.showAlert(`Собрано! +${crop.sellPrice}💰 +${crop.exp} опыта`);
+                return;
+            }
+            
+            // С API
+            try {
+                const result = await apiCall('/harvest', { 
+                    userId: userData.user_id,
+                    cropId: cropId 
+                });
+                
+                userData = result.user;
+                gameData.crops = result.crops;
+                
+                saveGameData();
+                updateHeader();
+                renderFarm();
+                
+                tg.showAlert(`Собрано! +${result.reward}💰 +${result.exp} опыта`);
+            } catch (error) {
+                console.error('Harvest error:', error);
+                tg.showAlert('Ошибка: ' + error.message);
+            }
+        }
+        
+        async function buyAnimal(animalType) {
+            const animal = ANIMALS[animalType];
+            
+            if (userData.coins < animal.cost) {
+                tg.showAlert('Недостаточно монет!');
+                return;
+            }
+            
+            // Без API - локально
+            if (!API_URL) {
+                userData.coins -= animal.cost;
+                
+                const now = Math.floor(Date.now() / 1000);
+                gameData.animals.push({
+                    id: Date.now(),
+                    animal_type: animalType,
+                    purchased_at: now,
+                    last_collected: now
+                });
+                
+                saveGameData();
+                updateHeader();
+                renderAnimals();
+                tg.showAlert(`${animal.name} куплена!`);
+                return;
+            }
+            
+            // С API
+            try {
+                const result = await apiCall('/buy-animal', { 
+                    userId: userData.user_id,
+                    animalType: animalType 
+                });
+                
+                userData = result.user;
+                gameData.animals = result.animals;
+                
+                saveGameData();
+                updateHeader();
+                renderAnimals();
+                
+                tg.showAlert(`${animal.name} куплена!`);
+            } catch (error) {
+                console.error('Buy animal error:', error);
+                tg.showAlert('Ошибка: ' + error.message);
+            }
+        }
+        
+        async function collectAnimal(animalId) {
+            // Без API - локально
+            if (!API_URL) {
+                const animal = gameData.animals.find(a => a.id === animalId);
+                if (!animal) return;
+                
+                const animalData = ANIMALS[animal.animal_type];
+                const now = Math.floor(Date.now() / 1000);
+                
+                if (now < animal.last_collected + animalData.productionTime) {
+                    tg.showAlert('Еще не готово!');
+                    return;
+                }
+                
+                userData.coins += animalData.value;
+                userData.experience += 10;
+                animal.last_collected = now;
+                
+                saveGameData();
+                updateHeader();
+                renderAnimals();
+                
+                tg.showAlert(`Собрано! +${animalData.value}💰 +10 опыта`);
+                return;
+            }
+            
+            // С API
+            try {
+                const result = await apiCall('/collect-animal', { 
+                    userId: userData.user_id,
+                    animalId: animalId 
+                });
+                
+                userData = result.user;
+                gameData.animals = result.animals;
+                
+                saveGameData();
+                updateHeader();
+                renderAnimals();
+                
+                tg.showAlert(`Собрано! +${result.reward}💰 +${result.exp} опыта`);
+            } catch (error) {
+                console.error('Collect error:', error);
+                tg.showAlert('Ошибка: ' + error.message);
+            }
+        }
+        
+        function updateTimers() {
+            document.querySelectorAll('.timer').forEach(timer => {
+                const harvestTime = parseInt(timer.dataset.harvest);
+                const now = Math.floor(Date.now() / 1000);
+                const remaining = Math.max(0, harvestTime - now);
+                timer.textContent = remaining > 0 ? formatTime(remaining) : '✅ Готово!';
+            });
+        }
+        
+        function formatTime(seconds) {
+            if (seconds < 60) return `${seconds}с`;
+            const minutes = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            if (minutes < 60) return secs > 0 ? `${minutes}м ${secs}с` : `${minutes}м`;
+            const hours = Math.floor(minutes / 60);
+            const mins = minutes % 60;
+            return mins > 0 ? `${hours}ч ${mins}м` : `${hours}ч`;
+        }
+        
+        // Инициализация
+        async function init() {
+            const initData = tg.initDataUnsafe;
+            if (!initData.user) {
+                document.body.innerHTML = '<div class="loading">Открой из Telegram</div>';
+                return;
+            }
+            
+            await loadGameData();
+            setInterval(updateTimers, 1000);
+        }
+        
+        init();
+    </script>
+</body>
+</html>
